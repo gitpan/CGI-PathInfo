@@ -1,0 +1,16 @@
+CGI::PathInfo
+
+A somewhat CGI.pm compatible package for manipulating PATH_INFO
+information in a manner similiar to GET method forms.
+
+ 1.00 22 July 2000  - Initial public release.
+
+To install:
+
+perl Makefile.PL
+make
+make test
+make install
+
+See 'perldoc CGI::PathInfo' for the documentation.
+

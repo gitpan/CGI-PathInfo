@@ -1,0 +1,6 @@
+Changes
+MANIFEST
+Makefile.PL
+README
+lib/CGI/PathInfo.pm
+t/01_cgi-pathinfo.t
