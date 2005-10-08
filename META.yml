@@ -1,6 +1,6 @@
 ---
 name: CGI-PathInfo
-version: 1.01
+version: 1.02
 author:
   - Benjamin Franz <snowhare@nihongo.org>
 abstract: A lightweight CGI processing package for using PATH_INFO like GET method form parameters
@@ -11,5 +11,5 @@ requires:
 provides:
   CGI::PathInfo:
     file: lib/CGI/PathInfo.pm
-    version: 1.01
+    version: 1.02
 generated_by: Module::Build version 0.261

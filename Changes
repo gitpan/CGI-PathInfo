@@ -1,4 +1,11 @@
-  1.01 2000.09.30    - Seperated POD into .pod file. Added more build tests.
+ 1.02 2005.10.08     - Extended test coverage to 100% of code, fixed bug
+                       with the 'stripleadingslash', 'striptrailingslash'
+                       code, added documentation of all instantation parameters
+                       to 'new' method, fixed missing 'Build.PL' declaration
+                       in MANIFEST. Fixed mis-calls of 'croak' after delayed
+                       load in error paths.
+
+  1.01 2005.09.30    - Seperated POD into .pod file. Added more build tests.
                        Added Build.PL, META.yml, GPL_License.txt, 
                        Artistic_License.txt, LICENSE. Deferred loading
                        of Carp and HTML::Entities unless needed.

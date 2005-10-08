@@ -1,54 +1,35 @@
 #!/usr/bin/perl -w
 
 use strict;
-use lib ('./blib','../blib','../lib','./lib');
+use lib ('./blib','./lib','../blib','../lib');
+
+BEGIN {
+    $ENV{'MOD_PERL'} = 'mod_perl/1.29';
+    $INC{'Apache.pm'} = 'inline-fake-apache';
+}
+
 use CGI::PathInfo;
 
-# General info for writing test modules: 
-#
-# When running as 'make test' the default
-# working directory is the one _above_ the 
-# 't/' directory. 
+my $do_tests = [1..4];
 
-my @do_tests=(1..4);
-
-my $test_subs = { 
+my $test_subs = {
        1 => { -code => \&instantation,       -desc => ' instantation                   ' },
        2 => { -code => \&bad_initialization, -desc => ' bad initialization             ' },
        3 => { -code => \&test1,              -desc => ' parameter list                 ' },
        4 => { -code => \&test2,              -desc => ' values lists                   ' },
 };
 
-print $do_tests[0],'..',$do_tests[$#do_tests],"\n";
-print STDERR "\n";
-my $n_failures = 0;
-foreach my $test (@do_tests) {
-	my $sub  = $test_subs->{$test}->{-code};
-	my $desc = $test_subs->{$test}->{-desc};
-	my $failure = '';
-	eval { $failure = &$sub; };
-	if ($@) {
-		$failure = $@;
-	}
-	if ($failure ne '') {
-		chomp $failure;
-		print "not ok $test\n";
-		print STDERR "    $desc - $failure\n";
-		$n_failures++;
-	} else {
-		print "ok $test\n";
-		print STDERR "    $desc - ok\n";
+run_tests($test_subs,$do_tests);
 
-	}
-}
-print "END\n";
 exit;
+
+###########################################################################################
 
 ########################################
 # Instantation                         #
 ########################################
 sub instantation {
-    $ENV{'PATH_INFO'} = '/test1a-value1/test1b-value2/fake.html';
+    $ENV{'MOD_PERL_PATH_INFO'} = '/test1a-value1/test1b-value2/fake.html';
 
     my $path_info;
     eval {
@@ -93,19 +74,6 @@ sub instantation {
         return 'failed instance constructor instatation'
     }
 
-    eval {
-        local $ENV{'PATH_INFO'};
-        $path_info     = CGI::PathInfo->new;
-        my @parms = $path_info->param;
-        if (@parms > 0) {
-            die ("mis-decoded undef PATH_INFO");
-        }
-    };
-    if ($@ or (not $path_info)) {
-        return "failed instance constructor instatation $@";
-    }
-
-
     return '';
 }
 
@@ -113,7 +81,7 @@ sub instantation {
 # Bad initialization parameters        #
 ########################################
 sub bad_initialization {
-    $ENV{'PATH_INFO'} = '/test1a-value1/test1b-value2/fake.html';
+    $ENV{'MOD_PERL_PATH_INFO'} = '/test1a-value1/test1b-value2/fake.html';
     eval {
         my $path_info     = CGI::PathInfo->new([ stripleadingslash => 0,
                                             striptrailingslash => 0,
@@ -173,7 +141,7 @@ sub bad_initialization {
 sub test1 {
 
     { 
-        $ENV{'PATH_INFO'} = '/test1a-value1/test1b-value2/fake.html';
+        $ENV{'MOD_PERL_PATH_INFO'} = '/test1a-value1/test1b-value2/fake.html';
         my $path_info     = CGI::PathInfo->new({ stripleadingslash => 0,
                                                 striptrailingslash => 0,
                                            });
@@ -190,7 +158,7 @@ sub test1 {
     }
 
     { 
-        $ENV{'PATH_INFO'} = '/test1a-value1/test1a-value2/fake.html';
+        $ENV{'MOD_PERL_PATH_INFO'} = '/test1a-value1/test1a-value2/fake.html';
         my $path_info     = CGI::PathInfo->new({ stripleadingslash => 0,
                                                 striptrailingslash => 0,
                                            });
@@ -217,7 +185,7 @@ sub test1 {
 # Number of returned values            #
 ########################################
 sub test2 {
-    $ENV{'PATH_INFO'} = '/test2b-value1/test2a-value2/test2a-value3/test2a-value4/fake.html';
+    $ENV{'MOD_PERL_PATH_INFO'} = '/test2b-value1/test2a-value2/test2a-value3/test2a-value4/fake.html';
     my $path_info     = CGI::PathInfo->new;
     my $expected_results = { 'test2a' => [qw(value1)],
                              'test2a' => [qw(value2 value3 value4)],
@@ -240,3 +208,74 @@ sub test2 {
 
     return '';
 }
+
+###########################################################################################
+
+sub run_tests {
+    my ($test_subs,$do_tests) = @_;
+
+    print @$do_tests[0],'..',@$do_tests[$#$do_tests],"\n";
+    print STDERR "\n";
+    my $n_failures = 0;
+    foreach my $test (@$do_tests) {
+        my $sub  = $test_subs->{$test}->{-code};
+        my $desc = $test_subs->{$test}->{-desc};
+        my $failure = '';
+        eval { $failure = &$sub; };
+        if ($@) {
+            $failure = $@;
+        }
+        if ($failure ne '') {
+            chomp $failure;
+            print "not ok $test\n";
+            print STDERR "    $desc - $failure\n";
+            $n_failures++;
+        } else {
+            print "ok $test\n";
+            print STDERR "    $desc - ok\n";
+
+        }
+    }
+    
+    print "END\n";
+}
+
+##########################################################################################
+##########################################################################################
+##########################################################################################
+#
+# Fake 'Apache' module to let us test the MOD_PERL support
+#
+package Apache;
+
+use vars qw ($ARGS);
+BEGIN {
+    $ARGS = '';
+}
+
+sub request {
+    my $proto = shift;
+    my $package = __PACKAGE__;
+    my $class = ref($proto) || $proto || $package;
+    my $self  = bless {}, $class;
+    return $self;
+}
+
+sub path_info { $ENV{'MOD_PERL_PATH_INFO'}; }
+
+sub register_cleanup {
+
+}
+
+sub args {
+    my $self = shift;
+
+    if (@_ > 0) {
+        my ($args) = @_;
+        $ARGS = $args;
+    } else {
+        return $ARGS;
+    }
+}
+
+1;

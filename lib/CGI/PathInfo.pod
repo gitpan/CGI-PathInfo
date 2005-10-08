@@ -84,7 +84,14 @@ CGI::PathInfo is compatible with ModPerl 1 in addition to normal CGI.
 
 =head1 CHANGES
 
- 1.01 2000.09.30 - Seperated POD into .pod file. Added more build tests.
+ 1.02 2005.10.08 - Extended test coverage to 100% of code, fixed bug
+                   with the 'stripleadingslash', 'striptrailingslash'
+                   code, added documentation of all instantation parameters
+                   to 'new' method, fixed missing 'Build.PL' declaration
+                   in MANIFEST. Fixed mis-calls of 'croak' after delayed
+                   load in error paths.
+
+ 1.01 2005.09.30 - Seperated POD into .pod file. Added more build tests.
                    Added Build.PL, META.yml, GPL_License.txt,
                    Artistic_License.txt, LICENSE. Deferred loading
                    of Carp and HTML::Entities unless needed.
@@ -133,9 +140,16 @@ invokation of 'new'.
 
 Example:
 
-  my $path_info = CGI::PathInfo->new({  Eq => '=',
-                                      SplitOn => '&',
+  my $path_info = CGI::PathInfo->new({  Eq                 => '=',
+                                        SplitOn            => '&',
+                                        StripLeadingSlash  => 0,
+                                        StripTrailingSlash => 0,
                 });
+
+The C<Eq> parameter declares the key/value seperator, C<SplitOn>
+declares the parameter tuples seperator, C<StripLeadingSlash> turns
+on (or off) the stripping of '/' characters from the front of the
+path, C<StripTrailingSlash> does the same for the end of the path string.
 
 It is probably a Bad Idea (tm) to set the Eq or SplitOn
 values to a letter or a number (A-Za-z0-9) unless you
@@ -242,7 +256,7 @@ Benjamin Franz <snowhare@nihongo.org>
 
 =head1 VERSION
 
-1.01 - released 2005.09.30
+1.02 - released 2005.10.08
 
 =head1 COPYRIGHT
 
