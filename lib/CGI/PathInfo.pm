@@ -1,265 +1,371 @@
 package CGI::PathInfo;
-
 use strict;
+use LEOCHARRE::DEBUG;
+use Carp;
+use warnings;
+use Exporter;
+use vars qw($VERSION @ISA @EXPORT_OK %EXPORT_TAGS);
 
-BEGIN {
-	$CGI::PathInfo::VERSION = '1.02';
+$VERSION = sprintf "%d.%02d", q$Revision: 1.2 $ =~ /(\d+)/g;
+
+@ISA = qw/ Exporter /;
+
+@EXPORT_OK = qw(
+abs_cgibin
+script_abs_loc
+script_abs_path
+script_ext
+script_filename
+script_filename_only
+script_rel_loc
+script_rel_path
+script_is_in_cgibin
+script_is_in_DOCUMENT_ROOT
+DOCUMENT_ROOT
+);
+
+%EXPORT_TAGS = (
+   all => \@EXPORT_OK,
+);
+
+
+
+
+sub script_abs_loc {
+   return _script_abs_loc();
+}
+sub script_abs_path {
+   return _script_abs_path();
 }
 
-# check for mod_perl and include the 'Apache' module if needed
-if (exists $ENV{'MOD_PERL'}) {
-	$| = 1;
-	require Apache;
+sub script_rel_path {
+
+   if ( my $docroot = DOCUMENT_ROOT() and my $abs = script_abs_path() ){
+      if ( $abs=~s/^$docroot// ){
+         return $abs;
+      }
+      debug('cant get rel path with docroot and abs path set');    
+   }
+
+   my $rel = _script_rel_path_last_resort();
+   return $rel;
 }
 
-sub new {
-	my $proto   = shift;
-	my $package = __PACKAGE__;
-	my $class;
-	if (ref($proto)) {
-		$class = ref ($proto);
-	} elsif ($proto) {
-		$class = $proto;
-	} else {
-		$class = $package;
-	}
-	my $self    = bless {},$class;
-
-	$self->{$package}->{'field_names'} = [];
-	$self->{$package}->{'field'}       = {};
-	$self->{$package}->{'settings'} = {
-								       'eq' => '-',
-								  'spliton' => '/',
-						'stripleadingslash' => 1,
-					   'striptrailingslash' => 1,
-							};
-
-	my $parms;
-	if ($#_ == 0) {
-		$parms = shift;
-	} elsif ($#_ > 0) {
-		if (0 == $#_ % 2) {
-			require Carp;
-			Carp::croak('[' . localtime(time) . "] [error] $package" . '::new() - odd number of passed parameters');
-		}
-		%$parms = @_;
-	} else {
-		$parms = {};
-	}
-	if (ref($parms) ne 'HASH') {
-		require Carp;
-		Carp::croak('[' . localtime(time) . "] [error] $package" . '::new() - Passed parameters do not appear to be valid');
-	}
-	my @parm_keys = keys %$parms;
-	foreach my $parm_name (@parm_keys) {
-		my $lc_parm_name = lc ($parm_name);
-		if (not exists $self->{$package}->{'settings'}->{$lc_parm_name}) {
-			require Carp;
-			Carp::croak('[' . localtime(time) . "] [error] $package" . "::new() - Passed parameter name '$parm_name' is not valid here");
-		}
-		$self->{$package}->{'settings'}->{$lc_parm_name} = $parms->{$parm_name};
-	}
-	$self->_decode_path_info;
-
-	return $self;
+sub _script_rel_path_last_resort {
+   my @caller = caller(1);
+   debug("caller @caller \n");
+   my $rel = $ENV{SCRIPT_NAME};
+   $rel ||= $0;
+   defined $rel or return;
+        
+   if ($rel=~/^\// ){
+      # then we cant determine it, because it's absolute      
+      debug("path starts with slash [$rel], must be absolute, we cannot determine rel path");
+   }
+   return "/$rel";
 }
 
-#######################################################################
-
-sub param {
-	my $self = shift;
-	my $package = __PACKAGE__;
-
-	if (1 < @_) {
-		my $n_parms = @_;
-		if (($n_parms % 2) == 1) {
-			require Carp;
-			Carp::croak('[' . localtime(time) . "] [error] $package" . "::param() - Odd number of parameters  passed");
-		}
-		my $parms = { @_ };
-		$self->_set($parms);
-		return;
-	}
-	if ((@_ == 1) and (ref ($_[0]) eq 'HASH')) {
-		my $parms = shift;
-		$self->_set($parms);
-		return;
-	}
-
-	my @result = ();
-	if ($#_ == -1) {
-		@result = @{$self->{$package}->{'field_names'}};
-	} else {
-		my ($fieldname)=@_;
-		if (defined($self->{$package}->{'field'}->{$fieldname})) {
-			@result = @{$self->{$package}->{'field'}->{$fieldname}->{'value'}};
-		}
-	}
-
-
-	if (wantarray) {
-		return @result;
-	} else {
-		return $result[0];
-	}
+sub script_rel_loc {
+   my $docroot = DOCUMENT_ROOT() or return;
+   my $abs = script_abs_loc() or return;
+   $abs=~s/^$docroot// or return;
+   return $abs;  
 }
 
-#######################################################################
-
-sub calling_parms_table {
-	my $self = shift;
-	my $package = __PACKAGE__;
-
-	require HTML::Entities;
-
-	my $outputstring = "<table border=\"1\" cellspacing=\"0\"><tr><th colspan=\"2\">PATH_INFO Fields</th></tr><tr><th>Field</th><th>Value</th></tr>\n";
-	my @field_list = $self->param;
-	foreach my $fieldname (sort @field_list) {
-		my @values = $self->param($fieldname);
-		my $sub_field_counter= $#values;
-		for (my $fieldn=0; $fieldn <= $sub_field_counter; $fieldn++) {
-			my $e_fieldname = HTML::Entities::encode_entities($fieldname);
-			my $fieldvalue  = HTML::Entities::encode_entities($values[$fieldn]);
-			$outputstring .= "<tr><td>$e_fieldname (#$fieldn)</td><td> $fieldvalue</td></tr>\n";
-		}
-	}
-
-	$outputstring .= "</table>\n";
-
-	return $outputstring;
+sub script_filename {
+   my $abs = script_abs_path() or return;
+   $abs=~s/^.+\/+//;
+   return $abs;   
 }
 
-#######################################################################
-
-sub url_encode {
-	my $self   = shift;
-	my ($line) = @_;
-
-	return '' if (! defined ($line));
-	$line =~ s/([^a-zA-Z0-9])/"\%".unpack("H",$1).unpack("h",$1)/egs;
-	return $line;
+sub script_filename_only {
+   my($filename,$ext) = _script_filename() or return;
+   return $filename;
 }
 
-#######################################################################
+sub script_ext {
+   my($filename,$ext) = _script_filename() or return;   
+   defined $ext and defined $filename or return;
+   return $ext;
+}
 
-sub url_decode {
-	my $self   = shift;
-	my ($line) = @_;
+sub DOCUMENT_ROOT {
+   return _get_docroot();
+}
 
-	return '' if (! defined ($line));
-	$line =~ s/\+/ /gos;
-	$line =~ s/%([a-fA-F0-9][a-fA-F0-9])/pack("C", hex($1))/egs;
-	return $line;
+sub abs_cgibin{
+   return _get_cgibin();
+}
+
+sub script_is_in_cgibin {
+   my $abs_script = script_abs_path() or return;
+   my $parent     = abs_cgibin() or return;
+
+   require Cwd::Ext;   
+   Cwd::Ext::abs_path_is_in($abs_script,$parent) or return 0;
+   return 1;   
+}
+
+sub script_is_in_DOCUMENT_ROOT {
+   my $abs_script = script_abs_path() or return;
+   my $parent     = DOCUMENT_ROOT() or return;
+
+   require Cwd::Ext;   
+   Cwd::Ext::abs_path_is_in($abs_script,$parent) or return 0;
+   return 1; 
 }
 
 
-########################################################################
-# Performs PATH_INFO decoding
 
-sub _decode_path_info {
-	my $self = shift;
-	my $package = __PACKAGE__;
+# priv
 
-	my $buffer = '';
-	if (exists $ENV{'MOD_PERL'}) {
-			  $buffer = Apache->request->path_info;
-	} else {
-			  $buffer = $ENV{'PATH_INFO'} if (defined $ENV{'PATH_INFO'});
-	}
-	$self->_burst_URL_encoded_buffer($buffer);
+sub _script_filename {
+   my $filename = script_filename() or return;
 
-	return;
+   my ($name,$ext);
+   
+   if( $filename=~/^([^\/]+)\.(\w+)$/){
+      ($name,$ext) = ($1,$2);      
+   }
+   
+   else {
+      $name = $filename;
+      $ext = undef;
+   }
+   return ($name,$ext);
 }
 
-##########################################################################
-# Bursts normal URL encoded buffers
-# Takes: $buffer   - the actual data to be burst
-#
-# parameters are presumed to be seperated by ';' characters
-#
+sub _get_docroot {   
 
-sub _burst_URL_encoded_buffer {
-	my $self = shift;
-	my $package = __PACKAGE__;
+   defined $ENV{DOCUMENT_ROOT} and return $ENV{DOCUMENT_ROOT};   
 
-	my ($buffer) = @_;
-	my $settings = $self->{$package}->{'settings'};
-	if ($settings->{'stripleadingslash'})  { $buffer =~ s#^/+##s; }
-	if ($settings->{'striptrailingslash'}) { $buffer =~ s#/+$##s; }
+   my $abs_dir = _script_abs_loc();   
+   _dir_looks_like_docroot($abs_dir) and return $abs_dir;
+   
+   
+   my @try = ( $abs_dir );
+   while ( $abs_dir=~s/\/[^\/]+$// ){
+      push @try, $abs_dir;      
+   }
 
-	my $spliton  = $settings->{'spliton'};
-	my $eq_mark  = $settings->{'eq'};
-
-	# Split the name-value pairs on the selected split char
-	my @pairs = ();
-	if ($buffer) {
-		@pairs = split(/$spliton/, $buffer);
-	}
-
-	# Initialize the field hash and the field_names array
-	$self->{$package}->{'field'}       = {};
-	$self->{$package}->{'field_names'} = [];
-
-	foreach my $pair (@pairs) {
-		my ($name, $data) = split(/$eq_mark/,$pair,2);
-
-		# Anything that didn't split is omitted from the output
-		next if (not defined $data);
-
-		# De-URL encode %-encoding
-		$name = $self->url_decode($name);
-		$data = $self->url_decode($data);
-
-		if (! defined ($self->{$package}->{'field'}->{$name}->{'count'})) {
-			push (@{$self->{$package}->{'field_names'}},$name);
-			$self->{$package}->{'field'}->{$name}->{'count'} = 0;
-		}
-		my $record      = $self->{$package}->{'field'}->{$name};
-		my $field_count = $record->{'count'};
-		$record->{'count'}++;
-		$record->{'value'}->[$field_count]     = $data;
-	}
-	return;
+   for my $abs_dir (@try){
+      my $docroot = _get_docroot_inside($abs_dir) or next;
+      return $docroot;
+   }
+   warn("cannot figure out DOCUMENT_ROOT, ENV is not set");
+   return;  
 }
 
-##################################################################
-#
-# Sets values into the object directly
-# Pass an anon hash for name/value pairs. Values may be
-# anon lists or simple strings
-#
-##################################################################
+sub _get_cgibin {   
 
-sub _set {
-	my $self = shift;
-	my $package = __PACKAGE__;
+   my $abs_dir = _script_abs_loc();   
+   _dir_looks_like_cgibin($abs_dir) and return $abs_dir;
+   
+   
+   my @try = ( $abs_dir );
+   while ( $abs_dir=~s/\/[^\/]+$// ){
+      push @try, $abs_dir;      
+   }
 
-	my ($parms) = @_;
-	foreach my $name (keys %$parms) {
-		my $value = $parms->{$name};
-		my $data  = [];
-		my $data_type = ref $value;
-		if (not $data_type) {
-			$data = [ $value ];
-		} elsif ($data_type eq 'ARRAY') {
-			# Shallow copy the anon array to prevent action at a distance
-			@$data = map {$_} @$value;
-		} else {
-			require Carp;
-			Carp::croak ('[' . localtime(time) . "] [error] $package"  . "::_set() - Parameter '$name' has illegal data type of '$data_type'");
-		}
-
-		if (! defined ($self->{$package}->{'field'}->{$name}->{'count'})) {
-			push (@{$self->{$package}->{'field_names'}},$name);
-		}
-		my $record = {};
-		$self->{$package}->{'field'}->{$name} = $record;
-		$record->{'count'} = @$data;
-		$record->{'value'} = $data;
-	}
-	return;
+   for my $abs_dir (@try){
+      my $docroot = _get_cgibin_inside($abs_dir) or next;
+      return $docroot;
+   }
+   warn("cannot figure out abs cgi-bin");
+   return;  
 }
 
-##########################################################################
+
+sub _dir_looks_like_docroot {
+   my $abs = shift;
+   $abs=~/\/public_html$|\/htdocs{0,1}$|\/html$/ or return 0;
+   return 1;
+}
+sub _dir_looks_like_cgibin {
+   my $abs = shift;
+   $abs=~/\/cgi\-bin$|\/cgi$/ or return 0;
+   return 1;
+}
+
+sub _get_docroot_inside {
+   my $abs_dir = shift;
+   debug("$abs_dir\n");
+
+   for(qw(public_html htdocs html)){
+      my $try ="$abs_dir/$_";
+      -d $try and return $try;     
+   }
+   return;
+}
+
+sub _get_cgibin_inside {
+   my $abs_dir = shift;
+   debug("$abs_dir\n");
+
+   for(qw(cgi-bin cgi)){
+      my $try ="$abs_dir/$_";
+      -d $try and return $try;     
+   }
+   return;
+}
+
+
+
+sub _script_abs_path {
+   my $abs = $0;
+
+   unless( defined $abs ){
+      defined $ENV{SCRIPT_NAME} or confess("cant get abs loc of script");
+      $abs = $ENV{SCRIPT_NAME};
+   }
+   
+   unless( $abs=~/^\//){
+      require Cwd;
+      $abs = Cwd::cwd().'/'.$abs;
+   }
+   return $abs;
+}
+
+
+sub _script_abs_loc {
+   my $abs = _script_abs_path();
+   $abs=~s/\/+[^\/]+$//;
+   return $abs;
+}
+
+
 
 1;
+
+__END__
+
+=head1 NAME
+
+LEOCHARRE::CGI::PathInfo - find web relevant paths even without ENV set
+
+=head1 SYNOPSIS
+
+   use CGI::PathInfo ':all';
+
+   $CGI::PathInfo::DEBUG = 1;
+
+   my $abs_path            = script_abs_path();
+   my $abs_loc             = script_abs_loc();
+   my $filename            = script_filename();
+   my $filename_only       = script_filename_only();
+   my $script_extension    = script_ext();
+   my $form_action         = script_rel_path();
+   my $script_dir          = script_rel_loc();
+   my $docroot             = DOCUMENT_ROOT();
+   my $cgibin              = abs_cgibin(;)
+   
+
+=head1 DESCRIPTION
+
+Sometimes you need to find where the document root is, and maybe DOCUMENT ROOT is not set
+Sometimes you want to get some info about the script, like it's abs path, it's rel path
+so a form knows how to point to itself.
+
+This uses some tricks to find those things even if environment variables are not set.
+
+=head2 WHY
+
+Even outside a cgi environment, a script usinng this can find its way around.
+For example in this fs hierarchy:
+
+   /home/user/
+   /home/user/public_html
+   /home/user/cgi-bin
+   /home/user/cgi-bin/a/script.cgi
+
+Even without DOCUMENT_ROOT set, script.cgi knows that document root is /home/user/public_html.
+Valid dir names are also htdocs and html.
+So, in this following fs hierarchy, it will also know to find document root:
+
+   /home/user/
+   /home/user/html
+   /home/user/html/script.cgi   
+   /home/user/cgi-bin
+
+The way it works, is it steps backwards and looks for these directories.
+
+
+
+=head1 SUBS
+
+None of these are exported by default.
+
+=head2 script_abs_path()
+
+returns script's absolute location
+on failure warns and returns undef
+
+=head2 script_abs_loc()
+
+returns script's abs path to the directory it resides in
+on failure warns and returns undef
+
+=head2 script_filename()
+
+returns the script's filename
+
+=head2 script_filename_only()
+
+returns the script's filename without ext (if there was one)
+
+=head2 script_ext()
+
+returns script's ext (without dot) if there is one
+returns undef if none
+
+=head2 abs_cgibin()
+
+tries to find path to cgi-bin
+may warn and return undef
+
+=head2 DOCUMENT_ROOT()
+
+assumes this is a website and returns document root
+if $ENV{DOCUMENT_ROOT} is not set, it tries to test and guess for it
+on failure returns undef
+
+=head2 script_rel_path()
+
+returns script's relative path to DOCUMENT_ROOT()
+warns and returns undef on failure
+
+=head2 script_rel_loc()
+
+returns the path of the directory the script resides in, relative to DOCUMENT_ROOT()
+warns and returns undef on failure
+
+=head2 script_is_in_DOCUMENT_ROOT()
+
+returns boolean
+returns undef if DOCUMENT_ROOT() can't return value.
+
+=head2 script_is_in_cgibin()
+
+returns boolean
+returns undef if abs_cgibin() can't return value.
+
+=head1 DEBUG
+
+   $CGI::PathInfo::DEBUG  = 1;
+
+=head1 BUGS
+
+Please contact AUTHOR.
+
+=head1 AUTHOR
+
+Leo Charre leocharre at cpan dot org
+
+=head1 SEE ALSO 
+
+Cwd::Ext
+Cwd
+
+=cut
+
+

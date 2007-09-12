@@ -1,15 +1,14 @@
----
-name: CGI-PathInfo
-version: 1.02
-author:
-  - Benjamin Franz <snowhare@nihongo.org>
-abstract: A lightweight CGI processing package for using PATH_INFO like GET method form parameters
-license: perl
+# http://module-build.sourceforge.net/META-spec.html
+#XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
+name:         CGI-PathInfo
+version:      1.02
+version_from: lib/CGI/PathInfo.pm
+installdirs:  site
 requires:
-  Carp: 0
-  HTML::Entities: 0
-provides:
-  CGI::PathInfo:
-    file: lib/CGI/PathInfo.pm
-    version: 1.02
-generated_by: Module::Build version 0.261
+    Carp:                          0
+    Cwd:                           0
+    Cwd::Ext:                      1.03
+    LEOCHARRE::DEBUG:              1.02
+
+distribution_type: module
+generated_by: ExtUtils::MakeMaker version 6.30
