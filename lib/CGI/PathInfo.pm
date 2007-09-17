@@ -6,7 +6,7 @@ use warnings;
 use Exporter;
 use vars qw($VERSION @ISA @EXPORT_OK %EXPORT_TAGS);
 
-$VERSION = sprintf "%d.%02d", q$Revision: 1.2 $ =~ /(\d+)/g;
+$VERSION = sprintf "%d.%02d", q$Revision: 1.3 $ =~ /(\d+)/g;
 
 @ISA = qw/ Exporter /;
 
@@ -48,12 +48,14 @@ sub script_rel_path {
    }
 
    my $rel = _script_rel_path_last_resort();
-   return $rel;
+   $rel=~s/^\/+//;  
+   return "/$rel";
 }
 
 sub _script_rel_path_last_resort {
-   my @caller = caller(1);
-   debug("caller @caller \n");
+  # my @caller = caller(1);
+   #@caller
+  # debug("caller @caller \n");
    my $rel = $ENV{SCRIPT_NAME};
    $rel ||= $0;
    defined $rel or return;
